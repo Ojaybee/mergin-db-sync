@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import random
+import boto3
 
 import psycopg2
 from psycopg2 import sql
@@ -30,6 +31,22 @@ os.environ["GEODIFF_LOGGER_LEVEL"] = '4'   # 0 = nothing, 1 = errors, 2 = warnin
 
 class DbSyncError(Exception):
     pass
+
+def _invoke_lambda():
+    print("Invoking Lambda")
+    if config.arcgis.arcgis:
+        try:
+            data = {"fname":config.arcgis.fname, "url":config.arcgis.url}
+            client = boto3.client("lambda",region_name=config.aws.region)
+
+            client.invoke(
+                FunctionName=config.aws.functionarn,
+                # FunctionName='arn:aws:lambda:eu-west-1:377414624084:function:arcgis-mergin',
+                InvocationType="Event",
+                Payload=json.dumps(data)
+            )
+        except:
+           print("Lambda invoke error.")
 
 
 def _tables_list_to_string(tables):
@@ -313,12 +330,14 @@ def pull(conn_cfg, mc):
         print("Applying new version [no rebase]")
         _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base, tmp_base2their, ignored_tables)
         _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.modified, tmp_base2their, ignored_tables)
+        _invoke_lambda()
     else:
         print("Applying new version [WITH rebase]")
         tmp_conflicts = os.path.join(tmp_dir, f'{project_name}-dbsync-pull-conflicts')
         _geodiff_rebase(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base,
                         conn_cfg.modified, tmp_base2their, tmp_conflicts, ignored_tables)
         _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base, tmp_base2their, ignored_tables)
+        _invoke_lambda()
 
     os.remove(gpkg_basefile_old)
     conn = psycopg2.connect(conn_cfg.conn_info)
@@ -467,7 +486,7 @@ def push(conn_cfg, mc):
 
     version = _get_project_version(work_dir)
     print("Pushed new version to Mergin Maps: " + version)
-
+    _invoke_lambda()
     # update base schema in the DB
     print("Updating DB base schema...")
     _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base, tmp_changeset_file, ignored_tables)
