@@ -4,5 +4,12 @@ geodiff_exe: /geodiff/build/geodiff
 mergin:
   url: https://app.merginmaps.com
 
+
+arcgis:
+  arcgis: False
+
+aws:
+  aws: False
+
 daemon:
   sleep_time: 10
