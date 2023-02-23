@@ -19,6 +19,7 @@ RUN apt-get update && apt-get install -y \
 RUN python3 -m pip install --upgrade pip
 RUN pip3 install dynaconf==3.1.7
 RUN pip3 install scikit-build wheel cmake
+RUN pip3 install boto3
 
 # geodiff (version >= 1.0.0 is needed with PostgreSQL support - we have to compile it)
 RUN git clone --branch master https://github.com/merginmaps/geodiff.git
