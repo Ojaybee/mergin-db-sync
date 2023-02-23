@@ -16,6 +16,7 @@ import sys
 import tempfile
 import random
 import uuid
+import boto3
 
 import psycopg2
 from itertools import chain
@@ -32,6 +33,22 @@ os.environ["GEODIFF_LOGGER_LEVEL"] = '4'   # 0 = nothing, 1 = errors, 2 = warnin
 
 class DbSyncError(Exception):
     pass
+
+def _invoke_lambda():
+    print("Invoking Lambda")
+    if config.arcgis.arcgis:
+        try:
+            data = {"fname":config.arcgis.fname, "url":config.arcgis.url}
+            client = boto3.client("lambda",region_name=config.aws.region)
+
+            client.invoke(
+                FunctionName=config.aws.functionarn,
+                # FunctionName='arn:aws:lambda:eu-west-1:377414624084:function:arcgis-mergin',
+                InvocationType="Event",
+                Payload=json.dumps(data)
+            )
+        except:
+           print("Lambda invoke error.")
 
 
 def _tables_list_to_string(tables):
@@ -393,12 +410,15 @@ def pull(conn_cfg, mc):
         print("Applying new version [no rebase]")
         _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base, tmp_base2their, ignored_tables)
         _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.modified, tmp_base2their, ignored_tables)
+        _invoke_lambda()
     else:
         print("Applying new version [WITH rebase]")
         tmp_conflicts = os.path.join(tmp_dir, f'{project_name}-dbsync-pull-conflicts')
         _geodiff_rebase(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base,
                         conn_cfg.modified, tmp_base2their, tmp_conflicts, ignored_tables)
         _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base, tmp_base2their, ignored_tables)
+        _invoke_lambda()
+
 
     os.remove(gpkg_basefile_old)
     conn = psycopg2.connect(conn_cfg.conn_info)
@@ -557,7 +577,7 @@ def push(conn_cfg, mc):
     print("Updating DB base schema...")
     _geodiff_apply_changeset(conn_cfg.driver, conn_cfg.conn_info, conn_cfg.base, tmp_changeset_file, ignored_tables)
     _set_db_project_comment(conn, conn_cfg.base, conn_cfg.mergin_project, version)
-
+    _invoke_lambda()
 
 def init(conn_cfg, mc, from_gpkg=True):
     """ Initialize the dbsync so that it is possible to do two-way sync between Mergin Maps and a database """
