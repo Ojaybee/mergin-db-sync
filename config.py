@@ -49,6 +49,16 @@ def validate_config(config):
             if len(config.connections) <= 0:
                 raise ConfigError("Config error: Ignored tables list can not be empty")
 
+    if (config.arcgis.arcgis == False):
+        pass
+    elif not (config.arcgis.fname and config.arcgis.url):
+        raise ConfigError("Config error: Filename and url for ArcGIS cannot be empty")
+
+    if (config.aws.aws == False):
+        pass
+    elif not (config.aws.region and config.aws.functionarn):
+        raise ConfigError("Config error: Region and function arn for AWS cannot be empty")
+
 
 def get_ignored_tables(connection):
     return connection.skip_tables if "skip_tables" in connection else []
